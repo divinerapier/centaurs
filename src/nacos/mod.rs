@@ -25,15 +25,15 @@ impl Default for API {
             .unwrap_or(8848);
         let host = HostInfo::parse(&format!("{server}:{port}"));
         let tenant = std::env::var("NACOS_NAMESPACE").unwrap_or_default();
-        let data_id = std::env::var("NACOS_DATA_ID").unwrap_or_default();
+        let data_id = std::env::var("NACOS_DATA_ID").unwrap();
         let group = std::env::var("NACOS_GROUP").unwrap_or_else(|_| "DEFAULT_GROUP".to_string());
-        let server_name = std::env::var("NACOS_SERVER_NAME").unwrap();
+        let server_name = std::env::var("KUBERNETES_SERVICE_NAME").unwrap();
         tracing::debug!("NACOS_SERVER: {}", server);
         tracing::debug!("NACOS_PORT: {}", port);
         tracing::debug!("NACOS_NAMESPACE: {}", tenant);
         tracing::debug!("NACOS_DATA_ID: {}", data_id);
         tracing::debug!("NACOS_GROUP: {}", group);
-        tracing::debug!("NACOS_SERVER_NAME: {}", server_name);
+        tracing::debug!("KUBERNETES_SERVICE_NAME: {}", server_name);
 
         let naming = NamingClient::new(HostInfo::new(&server, port as u32), server_name);
         let config = ConfigClient::new(host, tenant.clone());
