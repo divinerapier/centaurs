@@ -83,9 +83,9 @@ impl Default for ConsumerBuilder {
             enable_auto_offset_store: false,
             enable_auto_commit: true,
             enable_partition_eof: false,
-            auto_commit_interval_ms: 5000,
+            auto_commit_interval_ms: 1000,
             max_poll_interval_ms: 300000,
-            session_timeout_ms: 45000,
+            session_timeout_ms: 10000,
             heartbeat_interval_ms: 3000,
         }
     }
@@ -221,7 +221,7 @@ impl<'a> super::Consumer for &'a Consumer {
         if self.auto_commit() {
             self.inner.store_offset_from_message(&message)?;
         } else {
-            self.inner.commit_message(&message, CommitMode::Sync)?;
+            self.inner.commit_message(&message, CommitMode::Async)?;
         }
         Ok(())
     }

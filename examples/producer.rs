@@ -14,15 +14,22 @@ async fn main() {
         .unwrap()
         .as_secs();
 
-    for i in 0.. {
-        let result = producer
-            .send(
-                FutureRecord::to(&std::env::var("TOPIC").unwrap())
-                    .payload(&format!("{}-{}", start, i))
-                    .key(""),
-                Timeout::Never,
-            )
-            .await;
-        tracing::info!("result: {:?}", result);
-    }
+    let tasks = (0..8).map(|tid| {
+        let producer = producer.clone();
+        async move {
+            for i in 0.. {
+                let result = producer
+                    .send(
+                        FutureRecord::to(&std::env::var("TOPIC").unwrap())
+                            .payload(&format!("{}-{}-{}", tid, start, i))
+                            .key(""),
+                        Timeout::Never,
+                    )
+                    .await;
+                tracing::info!("result: {:?}", result);
+            }
+        }
+    });
+
+    futures::future::join_all(tasks).await;
 }

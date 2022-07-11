@@ -6,11 +6,10 @@ pub fn local_address(name: &str) -> Option<String> {
         .into_iter()
         .filter(|nic| nic.name.eq(&name))
         .take(1)
-        .nth(0)?
+        .next()?
         .ips
         .into_iter()
-        .filter(|ip| ip.is_ipv4())
-        .nth(0)?;
+        .find(|ip| ip.is_ipv4())?;
     Some(ip.ip().to_string())
 }
 

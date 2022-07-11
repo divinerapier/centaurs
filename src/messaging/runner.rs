@@ -39,7 +39,9 @@ where
         let _guard = self
             .consumer
             .subscribe(topics)
-            .map_err(|e| Error::<C::Error, P::Error>::Consumer(e))?;
+            .map_err(Error::<C::Error, P::Error>::Consumer)?;
+
+        tracing::info!("subscribe topic: {:?}", topics);
 
         let mut signal = Box::pin(signal).fuse();
 
@@ -49,15 +51,17 @@ where
                     tracing::warn!("Runner receive a signal. Quit!");
                     break Ok(());
                 }
-                default => {}
+                complete => break Ok(()),
+                default => {},
             };
+
             match self.consumer.poll().await {
                 Ok(Some(message)) => match self.processor.process(&message).await {
                     Ok(_output) => {
                         self.consumer
                             .commit(message)
                             .await
-                            .map_err(|e| Error::Consumer(e))?;
+                            .map_err(Error::Consumer)?;
                     }
                     Err(e) => return Err(Error::Processor(e)),
                 },
