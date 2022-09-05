@@ -1,19 +1,20 @@
+#[cfg(feature = "nacos-servicediscovery")]
 use super::Instance;
 
-impl super::Registry for crate::nacos::API {
+impl crate::servicediscovery::Registry for crate::nacos::API {
     fn register(&self, instance: &Instance) {
-        crate::nacos::API::register(&self, &instance);
+        crate::nacos::API::register(self, instance);
     }
 
     fn deregister(&self, instance: &Instance) {
-        crate::nacos::API::deregister(&self, instance);
+        crate::nacos::API::deregister(self, instance);
     }
 }
 
 #[tokio::test]
 async fn test_register() -> Result<(), String> {
     let nacos = crate::nacos::API::new_from_env().expect("failed to create nacos client");
-    let service_name = std::env::var("SERVICE_NAME").unwrap().to_string();
+    let service_name = std::env::var("SERVICE_NAME").unwrap();
     nacos.register(&Instance {
         ip: crate::datalink::local_address("docker0").ok_or_else(|| "nic not found".to_string())?,
         port: 6789,
@@ -28,7 +29,7 @@ async fn test_register() -> Result<(), String> {
     nacos.register(&Instance {
         ip: crate::datalink::local_address("wlan0").ok_or_else(|| "nic not found".to_string())?,
         port: 4567,
-        service_name: service_name.clone(),
+        service_name,
     });
     Ok(())
 }
