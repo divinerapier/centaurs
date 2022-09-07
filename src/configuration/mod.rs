@@ -1,47 +1,37 @@
+use std::path::Path;
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("load config: {0}")]
-    Load(String),
+    #[error("not found: {0}")]
+    NotFound(String),
 
-    #[error("decode config: {0}")]
-    Decode(String),
+    #[error("io: {0}")]
+    IO(#[from] std::io::Error),
+
+    #[error("other: {0}")]
+    Other(#[from] anyhow::Error),
 }
 
-pub async fn load<T>() -> Result<T, Error>
-where
-    T: serde::de::DeserializeOwned,
-{
-    let enable = std::env::var("NACOS_CONFIG_ENABLED")
-        .unwrap_or_default()
-        .parse::<bool>()
-        .unwrap_or_default();
-    if enable {
-        load_nacos().await
-    } else {
-        load_file().await
+#[async_trait::async_trait]
+pub trait Loader {
+    type Key;
+
+    async fn load(&self, key: Self::Key) -> Result<String, Error>;
+}
+
+pub struct FileLoader {}
+
+pub struct PathKeyParser {}
+
+#[async_trait::async_trait]
+impl Loader for FileLoader {
+    type Key = String;
+    async fn load(&self, key: Self::Key) -> Result<String, Error> {
+        let path = Path::new(&key);
+        if !path.exists() {
+            return Err(Error::NotFound(key.to_string()));
+        }
+        Ok(std::fs::read_to_string(path)?)
     }
 }
 
-pub async fn load_nacos<T>() -> Result<T, Error>
-where
-    T: serde::de::DeserializeOwned,
-{
-    let nacos = crate::nacos::API::new_from_env().expect("failed to create nacos client");
-    let config = nacos.load().await.map_err(|e| Error::Load(e.to_string()))?;
-    tracing::info!("CONFIG: {}", config);
-    Ok(decode(&config)?)
-}
-
-pub async fn load_file<T>() -> Result<T, Error>
-where
-    T: serde::de::DeserializeOwned,
-{
-    unimplemented!("load config from file")
-}
-
-pub fn decode<T>(value: &str) -> Result<T, Error>
-where
-    T: serde::de::DeserializeOwned,
-{
-    Ok(serde_yaml::from_str(value).map_err(|e| Error::Decode(e.to_string()))?)
-}

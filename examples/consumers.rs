@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{env::var, time::Duration};
 
 use centaurs::messaging::{
     kafka::Consumer, Failover, FailoverProcessor, Processor, RetriableProcessor,
@@ -6,7 +6,7 @@ use centaurs::messaging::{
 };
 use futures::{Future, FutureExt};
 use rdkafka::{error::KafkaError, message::BorrowedMessage, Message};
-use tokio::signal::unix::SignalKind;
+use tokio::signal::unix::{signal, SignalKind};
 
 pub struct TestKafkaProcessor {}
 
@@ -57,9 +57,9 @@ async fn main() {
 
 async fn basic_consumer() {
     let consumer = Consumer::builder()
-        .set_bootstrap(std::env::var("BOOTSTRAP").unwrap())
-        .set_group_id(std::env::var("GROUP_ID").unwrap())
-        .set_client_id(std::env::var("CLIENT_ID").unwrap_or_default())
+        .set_bootstrap(var("BOOTSTRAP").unwrap())
+        .set_group_id(var("GROUP_ID").unwrap())
+        .set_client_id(var("CLIENT_ID").unwrap_or_default())
         .build()
         .unwrap();
     let processor = TestKafkaProcessor {};
@@ -67,34 +67,34 @@ async fn basic_consumer() {
     // &TestKafkaProcessor 类型实现了 trait Processor, 因此下面需要传递 &processor
     let processor = RetriableProcessor::new(&processor, retries.into_iter());
     let runner = Runner::new(&consumer, processor);
-    let result = runner
-        .run(&[&std::env::var("TOPIC").unwrap()], catch_signal())
-        .await;
+    let result = runner.run(&[&var("TOPIC").unwrap()], catch_signal()).await;
     tracing::info!("final result: {:?}", result);
 }
 
+#[allow(unused)]
 async fn retriable_consumer() {
     let consumer = Consumer::builder()
-        .set_bootstrap(std::env::var("BOOTSTRAP").unwrap())
-        .set_group_id(std::env::var("GROUP_ID").unwrap())
-        .set_client_id(std::env::var("CLIENT_ID").unwrap_or_default())
+        .set_bootstrap(var("BOOTSTRAP").unwrap())
+        .set_group_id(var("GROUP_ID").unwrap())
+        .set_client_id(var("CLIENT_ID").unwrap_or_default())
         .build()
         .unwrap();
     let processor = TestKafkaProcessor {};
     let retries = vec![Duration::from_secs(1)];
     // &TestKafkaProcessor 类型实现了 trait Processor, 因此下面需要传递 &processor
-    let processor = centaurs::messaging::RetriableProcessor::new(&processor, retries.into_iter());
+    let processor = RetriableProcessor::new(&processor, retries.into_iter());
     let runner = Runner::new(&consumer, processor);
     runner
-        .run(&[&std::env::var("TOPIC").unwrap()], catch_signal())
+        .run(&[&var("TOPIC").unwrap()], catch_signal())
         .await
         .unwrap();
 }
 
+#[allow(unused)]
 async fn failover_consumer() {
     let consumer = Consumer::builder()
-        .set_bootstrap(std::env::var("BOOTSTRAP").unwrap())
-        .set_group_id(std::env::var("GROUP_ID").unwrap())
+        .set_bootstrap(var("BOOTSTRAP").unwrap())
+        .set_group_id(var("GROUP_ID").unwrap())
         .build()
         .unwrap();
     let processor = TestKafkaProcessor {};
@@ -104,17 +104,17 @@ async fn failover_consumer() {
     let processor = FailoverProcessor::new(processor, &TestKafkaFailover {});
     let runner = Runner::new(&consumer, processor);
     runner
-        .run(&[&std::env::var("TOPIC").unwrap()], catch_signal())
+        .run(&[&var("TOPIC").unwrap()], catch_signal())
         .await
         .unwrap();
 }
 
 fn catch_signal() -> impl Future {
     async {
-        let mut signal2 = tokio::signal::unix::signal(SignalKind::interrupt()).unwrap();
-        let mut signal15 = tokio::signal::unix::signal(SignalKind::terminate()).unwrap();
-        let mut signal_user1 = tokio::signal::unix::signal(SignalKind::user_defined1()).unwrap();
-        let mut signal_user2 = tokio::signal::unix::signal(SignalKind::user_defined2()).unwrap();
+        let mut signal2 = signal(SignalKind::interrupt()).unwrap();
+        let mut signal15 = signal(SignalKind::terminate()).unwrap();
+        let mut signal_user1 = signal(SignalKind::user_defined1()).unwrap();
+        let mut signal_user2 = signal(SignalKind::user_defined2()).unwrap();
         futures::select! {
             _ = signal2.recv().fuse() => {
                 tracing::warn!("receive signal 2");

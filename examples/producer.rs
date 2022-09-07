@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use rdkafka::{producer::FutureRecord, util::Timeout};
 
 #[tokio::main]
@@ -9,8 +11,8 @@ async fn main() {
         .create()
         .unwrap();
 
-    let start = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
+    let start = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs();
 

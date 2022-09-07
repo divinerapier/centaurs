@@ -73,7 +73,7 @@ mod test {
 
     #[test]
     fn test_decode() {
-        fn check(name: &str, value: &str, expected: impl Into<Option<u64>>) {
+        fn check(_name: &str, value: &str, expected: impl Into<Option<u64>>) {
             let result = decode(value);
             assert_eq!(expected.into(), result);
         }

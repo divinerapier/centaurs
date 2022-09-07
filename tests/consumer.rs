@@ -1,8 +1,7 @@
 use std::sync::atomic::AtomicUsize;
 
+use centaurs::messaging::{kafka::Consumer, Processor, Runner};
 use rdkafka::message::BorrowedMessage;
-
-use super::*;
 
 struct BaseProcessor {
     counter: AtomicUsize,
@@ -10,7 +9,7 @@ struct BaseProcessor {
 }
 
 #[async_trait::async_trait]
-impl<'a> super::Processor for &'a BaseProcessor {
+impl<'a> Processor for &'a BaseProcessor {
     type Item = BorrowedMessage<'a>;
     type Output = ();
     type Error = String;
@@ -34,7 +33,7 @@ impl<'a> super::Processor for &'a BaseProcessor {
 
 #[tokio::test(worker_threads = 2, flavor = "multi_thread")]
 async fn test() {
-    let consumer = super::kafka::Consumer::builder()
+    let consumer = Consumer::builder()
         .set_bootstrap("localhost:9092")
         .set_group_id("test")
         .build()

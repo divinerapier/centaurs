@@ -1,35 +1,56 @@
-#[cfg(feature = "nacos-servicediscovery")]
-use super::Instance;
+use std::sync::Arc;
 
-impl crate::servicediscovery::Registry for crate::nacos::API {
-    fn register(&self, instance: &Instance) {
-        crate::nacos::API::register(self, instance);
-    }
+use nacos_rust_client::client::{
+    naming_client::{Instance, NamingClient},
+    HostInfo,
+};
 
-    fn deregister(&self, instance: &Instance) {
-        crate::nacos::API::deregister(self, instance);
+use super::Nacos;
+
+impl Nacos {
+    pub fn registry(&self) -> Registry {
+        Registry {
+            inner: NamingClient::new(
+                HostInfo::new(&self.server, self.port),
+                "cfg.server_name".to_string(),
+            ),
+            group: "".to_string(),
+            tenant: "".to_string(),
+        }
     }
 }
 
-#[tokio::test]
-async fn test_register() -> Result<(), String> {
-    let nacos = crate::nacos::API::new_from_env().expect("failed to create nacos client");
-    let service_name = std::env::var("SERVICE_NAME").unwrap();
-    nacos.register(&Instance {
-        ip: crate::datalink::local_address("docker0").ok_or_else(|| "nic not found".to_string())?,
-        port: 6789,
-        service_name: service_name.clone(),
-    });
-    nacos.register(&Instance {
-        ip: crate::datalink::local_address("enp4s0f4u2u4")
-            .ok_or_else(|| "nic not found".to_string())?,
-        port: 5678,
-        service_name: service_name.clone(),
-    });
-    nacos.register(&Instance {
-        ip: crate::datalink::local_address("wlan0").ok_or_else(|| "nic not found".to_string())?,
-        port: 4567,
-        service_name,
-    });
-    Ok(())
+pub struct Registry {
+    inner: Arc<NamingClient>,
+    group: String,
+    tenant: String,
+}
+
+#[async_trait::async_trait]
+impl crate::servicediscovery::Registry for Registry {
+    type Instance = Instance;
+
+    async fn register(&self, instance: Arc<Self::Instance>) {
+        self.inner.register(Instance::new(
+            &instance.ip,
+            instance.port,
+            &instance.service_name,
+            &self.group,
+            "",
+            &self.tenant,
+            None,
+        ));
+    }
+
+    async fn unregister(&self, instance: Arc<Self::Instance>) {
+        self.inner.unregister(Instance::new(
+            &instance.ip,
+            instance.port,
+            &instance.service_name,
+            &self.group,
+            "",
+            &self.tenant,
+            None,
+        ));
+    }
 }

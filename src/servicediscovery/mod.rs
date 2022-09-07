@@ -1,75 +1,34 @@
-use std::{collections::HashMap, sync::Mutex};
+use std::sync::Arc;
 
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("duplicated register with name: {0}")]
-    DuplicatedRegister(String),
+#[async_trait::async_trait]
+pub trait Registry {
+    type Instance;
+
+    async fn register(&self, instance: Arc<Self::Instance>);
+
+    async fn unregister(&self, instance: Arc<Self::Instance>);
 }
 
-#[derive(derive_builder::Builder)]
-pub struct Instance {
-    pub ip: String,
-    pub port: u32,
-    pub service_name: String,
+pub struct Discovery<T> {
+    registry: Box<dyn Registry<Instance = T>>,
 }
 
-pub trait Registry: Send {
-    fn register(&self, instance: &Instance);
-
-    fn deregister(&self, instance: &Instance);
-}
-
-pub struct Discovery {
-    registry: Box<dyn Registry>,
-}
-
-impl Discovery {
-    pub fn register(self, instance: Option<Instance>) -> Option<RegisterGuard> {
+impl<T> Discovery<T> {
+    pub async fn register(self, instance: Option<T>) -> Option<RegisterGuard<T>> {
         let registry = self.registry;
-        let instance = instance?;
-        registry.register(&instance);
+        let instance = Arc::new(instance?);
+        registry.register(instance.clone()).await;
         Some(RegisterGuard { registry, instance })
     }
 }
 
-pub struct RegisterGuard {
-    pub(crate) registry: Box<dyn Registry>,
-    pub(crate) instance: Instance,
+pub struct RegisterGuard<T> {
+    pub(crate) registry: Box<dyn Registry<Instance = T>>,
+    pub(crate) instance: Arc<T>,
 }
 
-impl Drop for RegisterGuard {
+impl<T> Drop for RegisterGuard<T> {
     fn drop(&mut self) {
-        self.registry.deregister(&self.instance);
+        futures::executor::block_on(self.registry.unregister(self.instance.clone()));
     }
-}
-
-pub type Factory = fn() -> Result<Box<dyn Registry>, Box<dyn std::error::Error>>;
-
-lazy_static::lazy_static! {
-    static ref FACTORIES: Mutex<HashMap <String,Factory>> =  Mutex::new(HashMap::new());
-}
-
-pub fn register_factory(name: String, f: Factory) -> Result<(), Error> {
-    let mut factories = FACTORIES.lock().unwrap();
-    factories
-        .get(&name)
-        .ok_or_else(|| Error::DuplicatedRegister(name.clone()))?;
-    factories.insert(name, f);
-    Ok(())
-}
-
-pub fn init() -> Option<Discovery> {
-    let registries = FACTORIES.lock().unwrap();
-    for (name, factory) in registries.iter() {
-        match factory() {
-            Ok(registry) => {
-                tracing::info!("use register: {}", name);
-                return Some(Discovery { registry });
-            }
-            Err(e) => {
-                tracing::warn!("register {} with error {}", name, e);
-            }
-        }
-    }
-    None
 }
