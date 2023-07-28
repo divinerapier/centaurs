@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use nacos_rust_client::client::{
-    naming_client::{Instance, NamingClient},
+    naming_client::{Instance, NamingClient, QueryInstanceListParams},
     HostInfo,
 };
 
@@ -16,6 +16,19 @@ impl Nacos {
             namespace.to_string(),
         ))
     }
+
+    pub async fn query(&self, service_name: &str, group_name: &str) -> Vec<Arc<Instance>> {
+        let client = NamingClient::new(HostInfo::new(&self.server, self.port), "".to_string());
+        let instances = client
+            .query_instances(QueryInstanceListParams::new_simple(
+                service_name,
+                group_name,
+            ))
+            .await
+            .unwrap();
+
+        instances
+    }
 }
 
 #[async_trait::async_trait]
@@ -28,5 +41,15 @@ impl crate::servicediscovery::Registry for Registry {
 
     async fn deregister(&self, instance: Arc<Self::Instance>) {
         self.0.unregister(Instance::clone(&instance));
+    }
+
+    async fn query(&self, service_name: &str, group_name: &str) -> Vec<Arc<Self::Instance>> {
+        self.0
+            .query_instances(QueryInstanceListParams::new_simple(
+                service_name,
+                group_name,
+            ))
+            .await
+            .unwrap()
     }
 }

@@ -7,10 +7,12 @@ pub trait Registry {
     async fn register(&self, instance: Arc<Self::Instance>);
 
     async fn deregister(&self, instance: Arc<Self::Instance>);
+
+    async fn query(&self, service_name: &str, group_name: &str) -> Vec<Arc<Self::Instance>>;
 }
 
 pub struct Discovery<T> {
-    registry: Box<dyn Registry<Instance = T>>,
+    registry: Arc<dyn Registry<Instance = T>>,
 }
 
 impl<T> Discovery<T> {
@@ -19,20 +21,25 @@ impl<T> Discovery<T> {
         R: Registry<Instance = T> + 'static,
     {
         Discovery {
-            registry: Box::new(registry),
+            registry: Arc::new(registry),
         }
     }
 
-    pub async fn register(self, instance: T) -> RegisterGuard<T> {
-        let registry = self.registry;
+    pub async fn register(&self, instance: T) -> RegisterGuard<T> {
+        let registry = self.registry.clone();
         let instance = Arc::new(instance);
         registry.register(instance.clone()).await;
         RegisterGuard { registry, instance }
     }
+
+    pub async fn query(&self, service_name: &str, group_name: &str) -> Vec<Arc<T>> {
+        let registry = self.registry.clone();
+        registry.query(service_name, group_name).await
+    }
 }
 
 pub struct RegisterGuard<T> {
-    pub(crate) registry: Box<dyn Registry<Instance = T>>,
+    pub(crate) registry: Arc<dyn Registry<Instance = T>>,
     pub(crate) instance: Arc<T>,
 }
 

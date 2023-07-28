@@ -1,6 +1,6 @@
 [package]
 name = "centaurs"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 description = """
 A utility crate.
@@ -41,7 +41,7 @@ version = "1"
 features = ["rt", "macros", "rt-multi-thread", "signal"]
 
 [features]
-default = []
+default = ["full"]
 full = [
     "base62",
     "configuration",
